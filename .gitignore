@@ -1,3 +1,6 @@
+assets/external/
+.states
+.web
 # Python
 venv/
 __pycache__/
