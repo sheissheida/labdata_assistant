@@ -256,7 +256,7 @@ class AppState(rx.State):
         if not self.working_file_path or not self.has_valid_outlier_report:
             return
 
-        from core.outliers import nullify_outliers, cap_outliers
+        from core.outliers import nullify_outliers, cap_outliers, drop_outliers
 
         df = load_dataset(self.working_file_path)
 
@@ -265,7 +265,7 @@ class AppState(rx.State):
         elif self.outlier_treatment_strategy == "cap":
             result = cap_outliers(df, self.outlier_report)
         elif self.outlier_treatment_strategy == "drop":
-            pass
+            result = drop_outliers(df, self.outlier_report)
         else:
             return
 

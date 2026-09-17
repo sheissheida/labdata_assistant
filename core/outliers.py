@@ -121,6 +121,7 @@ def drop_outliers(df, outlier_report: dict) -> CleaningResult:
         "rows_before": len(df),
         "rows_after": len(df_cleaned),
         "rows_affected": len(rows_to_drop),
+        "rows_removed": len(rows_to_drop),
         "cells_affected": len(cells),
     }
 

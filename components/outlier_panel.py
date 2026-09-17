@@ -90,7 +90,7 @@ def outlier_panel() -> rx.Component:
                 rx.heading("Outlier Treatment", size="3", color="black", margin_bottom="0.5em"),
                 rx.text("Treatment method:", font_weight="bold", color="black", size="2"),
                 rx.select(
-                    ["nullify", "cap"],
+                    ["nullify", "cap", "drop"],
                     value=AppState.outlier_treatment_strategy,
                     on_change=AppState.set_outlier_treatment_strategy,
                     margin_bottom="1em",
