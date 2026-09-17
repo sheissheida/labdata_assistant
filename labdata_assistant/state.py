@@ -24,6 +24,8 @@ class AppState(rx.State):
     data_version: int = 0
     outlier_report_version: int = -1
     outlier_treatment_strategy: str = "nullify"
+    numeric_analysis_report: dict[str, dict[str, str]] = {}
+
 
     @rx.var
     def row_count(self) -> int:
@@ -281,3 +283,31 @@ class AppState(rx.State):
 
         self.outlier_report = {}
         self.outlier_report_version = -1
+
+    def generate_analysis_report(self):
+        if not self.working_file_path:
+            return
+
+        from core.analysis import analyze_numeric_columns
+
+        df = load_dataset(self.working_file_path)
+
+        self.numeric_analysis_report = analyze_numeric_columns(df)
+
+    @rx.var
+    def analysis_table_data(self) -> list[list[str]]:
+        if not self.numeric_analysis_report:
+            return []
+
+        data = []
+        for col, stats in self.numeric_analysis_report.items():
+            data.append([
+                str(col),
+                str(stats.get("count", "")),
+                str(stats.get("mean", "")),
+                str(stats.get("std", "")),
+                str(stats.get("min", "")),
+                str(stats.get("50%", "")),
+                str(stats.get("max", ""))
+            ])
+        return data

@@ -1,6 +1,7 @@
 import reflex as rx
 from .state import AppState
 from components.outlier_panel import outlier_panel
+from components.analysis_panel import analysis_panel
 
 
 def header() -> rx.Component:
@@ -234,6 +235,7 @@ def index() -> rx.Component:
                     dataset_summary(),
                     cleaning_section(),
                     outlier_panel(),
+                    analysis_panel(),
                     export_section(),
                     history_section(),
                     spacing="6",
