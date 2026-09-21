@@ -1,10 +1,28 @@
 import reflex as rx
 import os
+from pydantic import BaseModel
 from core.data_loader import load_dataset
 from core.inspector import inspect_dataset
 from core.cleaning import remove_duplicates
 from core.cleaning import handle_missing_values
 from core.outliers import detect_outliers_iqr
+
+
+class FreqItem(BaseModel):
+    category: str
+    count: str
+    percentage: str
+
+
+class CategoricalColumn(BaseModel):
+    name: str
+    total_rows: str
+    non_null_count: str
+    missing_count: str
+    unique_count: str
+    most_frequent: str
+    most_frequent_percentage: str
+    frequencies: list[FreqItem]
 
 
 class AppState(rx.State):
@@ -25,6 +43,7 @@ class AppState(rx.State):
     outlier_report_version: int = -1
     outlier_treatment_strategy: str = "nullify"
     numeric_analysis_report: dict[str, dict[str, str]] = {}
+    categorical_analysis_report: dict = {}
 
 
     @rx.var
@@ -311,3 +330,46 @@ class AppState(rx.State):
                 str(stats.get("max", ""))
             ])
         return data
+
+    def generate_categorical_report(self):
+        if not self.working_file_path:
+            return
+
+        import pandas as pd
+        from core.analysis import analyze_categorical_columns
+
+        df = pd.read_csv(self.working_file_path)
+
+        self.categorical_analysis_report = analyze_categorical_columns(df)
+
+
+    @rx.var
+    def categorical_ui_data(self) -> list[CategoricalColumn]:
+        if not self.categorical_analysis_report:
+            return []
+
+        ui_data = []
+        for col, stats in self.categorical_analysis_report.items():
+            freq_list = []
+            for f in stats.get("frequencies", []):
+                freq_list.append(
+                    FreqItem(
+                        category=f.get("category", ""),
+                        count=f.get("count", ""),
+                        percentage=f.get("percentage", "")
+                    )
+                )
+
+            ui_data.append(
+                CategoricalColumn(
+                    name=str(col),
+                    total_rows=str(stats.get("total_rows", "")),
+                    non_null_count=str(stats.get("non_null_count", "")),
+                    missing_count=str(stats.get("missing_count", "")),
+                    unique_count=str(stats.get("unique_count", "")),
+                    most_frequent=str(stats.get("most_frequent", "")),
+                    most_frequent_percentage=str(stats.get("most_frequent_percentage", "")),
+                    frequencies=freq_list
+                )
+            )
+        return ui_data
