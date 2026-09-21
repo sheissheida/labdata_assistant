@@ -44,6 +44,11 @@ class AppState(rx.State):
     outlier_treatment_strategy: str = "nullify"
     numeric_analysis_report: dict[str, dict[str, str]] = {}
     categorical_analysis_report: dict = {}
+    selected_categorical_column: str = ""
+
+
+    def set_selected_categorical_column(self, value: str):
+        self.selected_categorical_column = value
 
 
     @rx.var
@@ -373,3 +378,26 @@ class AppState(rx.State):
                 )
             )
         return ui_data
+
+    @rx.var
+    def categorical_chart_data(self) -> list[dict]:
+        if not self.selected_categorical_column or not self.categorical_ui_data:
+            return []
+
+        for col in self.categorical_ui_data:
+            if col.name == self.selected_categorical_column:
+                chart_data = []
+                for freq in col.frequencies:
+                    chart_data.append({
+                        "name": freq.category,
+                        "count": int(freq.count),
+                        "percentage": float(freq.percentage)
+                    })
+                return chart_data
+        return []
+
+    @rx.var
+    def categorical_column_names(self) -> list[str]:
+        if not self.categorical_ui_data:
+            return []
+        return [col.name for col in self.categorical_ui_data]
