@@ -45,11 +45,14 @@ class AppState(rx.State):
     numeric_analysis_report: dict[str, dict[str, str]] = {}
     categorical_analysis_report: dict = {}
     selected_categorical_column: str = ""
+    chart_type: str = "bar"
 
+
+    def set_chart_type(self, value: str):
+        self.chart_type = value
 
     def set_selected_categorical_column(self, value: str):
         self.selected_categorical_column = value
-
 
     @rx.var
     def row_count(self) -> int:
@@ -384,14 +387,17 @@ class AppState(rx.State):
         if not self.selected_categorical_column or not self.categorical_ui_data:
             return []
 
+        colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6", "#f97316", "#ec4899"]
+
         for col in self.categorical_ui_data:
             if col.name == self.selected_categorical_column:
                 chart_data = []
-                for freq in col.frequencies:
+                for i, freq in enumerate(col.frequencies):
                     chart_data.append({
                         "name": freq.category,
                         "count": int(freq.count),
-                        "percentage": float(freq.percentage)
+                        "percentage": float(freq.percentage),
+                        "fill": colors[i % len(colors)]
                     })
                 return chart_data
         return []
