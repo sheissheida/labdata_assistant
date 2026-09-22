@@ -36,6 +36,18 @@ class HeatmapCell(BaseModel):
     is_header: bool
 
 
+class LinearRegressionReport(BaseModel):
+    x_col: str
+    y_col: str
+    slope: str
+    intercept: str
+    equation: str
+    r2: str
+    rmse: str
+    mae: str
+    interpretation: str
+
+
 class AppState(rx.State):
     dataset_name: str = ""
     inspection_report: dict = {}
@@ -58,6 +70,10 @@ class AppState(rx.State):
     correlation_report: CorrelationMatrix | None = None
     selected_categorical_column: str = ""
     chart_type: str = "bar"
+    reg_x_column: str = ""
+    reg_y_column: str = ""
+    regression_report: LinearRegressionReport | None = None
+    regression_chart_data: list[dict] = []
 
 
     def set_chart_type(self, value: str):
@@ -491,3 +507,66 @@ class AppState(rx.State):
             rows.append(current_row)
 
         return rows
+
+    def set_reg_x_column(self, value: str):
+        self.reg_x_column = value
+
+    def set_reg_y_column(self, value: str):
+        self.reg_y_column = value
+
+    def run_linear_regression(self):
+        if not self.working_file_path or not self.reg_y_column:
+            return
+
+        import pandas as pd
+        from core.regression import calculate_linear_regression
+
+        df = pd.read_csv(self.working_file_path)
+        result = calculate_linear_regression(df, self.reg_x_column, self.reg_y_column)
+
+        if result:
+            slope = result["slope"]
+            intercept = result["intercept"]
+            r2 = result["r2"]
+
+            sign = "+" if intercept >= 0 else "-"
+            eq = f"Y = {slope:.4f}X {sign} {abs(intercept):.4f}"
+
+            if r2 > 0.8:
+                interp = "Strong linear relationship. The model explains most of the variance in the data."
+            elif r2 > 0.5:
+                interp = "Moderate linear relationship. The model has some predictive power."
+            else:
+                interp = "Weak or no linear relationship. A linear model may not be suitable for these variables."
+
+            self.regression_report = LinearRegressionReport(
+                x_col=result["x_col"],
+                y_col=result["y_col"],
+                slope=f"{slope:.4f}",
+                intercept=f"{intercept:.4f}",
+                equation=eq,
+                r2=f"{r2:.4f}",
+                rmse=f"{result['rmse']:.4f}",
+                mae=f"{result['mae']:.4f}",
+                interpretation=interp
+            )
+
+            clean_df = df[[self.reg_x_column, self.reg_y_column]].dropna()
+            chart_points = []
+            for _, row in clean_df.iterrows():
+                x_val = float(row[self.reg_x_column])
+                y_val = float(row[self.reg_y_column])
+                fit_val = slope * x_val + intercept
+
+                chart_points.append({
+                    "x": x_val,
+                    "y": y_val,
+                    "fit": fit_val
+                })
+
+            chart_points.sort(key=lambda p: p["x"])
+            self.regression_chart_data = chart_points
+
+        else:
+            self.regression_report = None
+            self.regression_chart_data = []
