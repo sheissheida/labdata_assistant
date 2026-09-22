@@ -4,6 +4,7 @@ from components.outlier_panel import outlier_panel
 from components.analysis_panel import analysis_panel
 from components.categorical_panel import categorical_panel
 from components.visualization_panel import visualization_panel
+from components.correlation_panel import correlation_panel
 
 
 def header() -> rx.Component:
@@ -240,6 +241,7 @@ def index() -> rx.Component:
                     analysis_panel(),
                     categorical_panel(),
                     visualization_panel(),
+                    correlation_panel(),
                     export_section(),
                     history_section(),
                     spacing="6",

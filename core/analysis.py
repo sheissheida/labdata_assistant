@@ -29,6 +29,7 @@ def analyze_numeric_columns(df: pd.DataFrame) -> dict:
 
     return analysis_report
 
+
 def analyze_categorical_columns(df: pd.DataFrame) -> dict:
     categorical_df = df.select_dtypes(include=["object", "category", "bool"])
     analysis_report = {}
@@ -82,3 +83,14 @@ def analyze_categorical_columns(df: pd.DataFrame) -> dict:
         }
 
     return analysis_report
+
+
+def calculate_correlation_matrix(df: pd.DataFrame) -> pd.DataFrame | None:
+    numeric_df = df.select_dtypes(include="number")
+
+    if numeric_df.shape[1] < 2:
+        return None
+
+    correlation_matrix = numeric_df.corr(method="pearson").round(4)
+
+    return correlation_matrix

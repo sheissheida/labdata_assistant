@@ -25,6 +25,17 @@ class CategoricalColumn(BaseModel):
     frequencies: list[FreqItem]
 
 
+class CorrelationMatrix(BaseModel):
+    variables: list[str]
+    matrix: list[list[str]]
+
+
+class HeatmapCell(BaseModel):
+    value: str
+    bg_color: str
+    is_header: bool
+
+
 class AppState(rx.State):
     dataset_name: str = ""
     inspection_report: dict = {}
@@ -44,6 +55,7 @@ class AppState(rx.State):
     outlier_treatment_strategy: str = "nullify"
     numeric_analysis_report: dict[str, dict[str, str]] = {}
     categorical_analysis_report: dict = {}
+    correlation_report: CorrelationMatrix | None = None
     selected_categorical_column: str = ""
     chart_type: str = "bar"
 
@@ -407,3 +419,75 @@ class AppState(rx.State):
         if not self.categorical_ui_data:
             return []
         return [col.name for col in self.categorical_ui_data]
+
+    def generate_correlation_report(self):
+        if not self.working_file_path:
+            return
+
+        import pandas as pd
+        from core.analysis import calculate_correlation_matrix
+
+        df = pd.read_csv(self.working_file_path)
+        corr_df = calculate_correlation_matrix(df)
+
+        if corr_df is not None:
+            variables = corr_df.columns.tolist()
+
+            matrix_data = []
+            for row_var in variables:
+                row_values = []
+                for col_var in variables:
+                    val = corr_df.loc[row_var, col_var]
+                    clean_val = "" if pd.isna(val) else str(val)
+                    row_values.append(clean_val)
+                matrix_data.append(row_values)
+
+            self.correlation_report = CorrelationMatrix(
+                variables=variables,
+                matrix=matrix_data
+            )
+        else:
+            self.correlation_report = None
+
+    @rx.var
+    def correlation_table_headers(self) -> list[str]:
+        if self.correlation_report is None or not self.correlation_report.variables:
+            return []
+
+        return ["Variable"] + self.correlation_report.variables
+
+    @rx.var
+    def correlation_heatmap_rows(self) -> list[list[HeatmapCell]]:
+        if self.correlation_report is None or not self.correlation_report.variables:
+            return []
+
+        def get_color(val_str: str) -> str:
+            try:
+                val = float(val_str)
+
+                if val == 1.0: return "#60a5fa"
+                elif val >= 0.7: return "#93c5fd"
+                elif val >= 0.3: return "#bfdbfe"
+                elif val > 0: return "#dbeafe"
+                elif val <= -0.7: return "#f87171"
+                elif val <= -0.3: return "#fca5a5"
+                elif val < 0: return "#fee2e2"
+                return "#ffffff"
+            except:
+                return "#ffffff"
+
+        rows: list[list[HeatmapCell]] = []
+        for i, var in enumerate(self.correlation_report.variables):
+            current_row = [HeatmapCell(value=str(var), bg_color="f3f4f6", is_header=True)]
+
+            for val in self.correlation_report.matrix[i]:
+                current_row.append(
+                    HeatmapCell(
+                        value=str(val),
+                        bg_color=get_color(str(val)),
+                        is_header=False
+                    )
+                )
+            rows.append(current_row)
+
+        return rows
