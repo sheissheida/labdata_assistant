@@ -59,6 +59,16 @@ class PolynomialRegressionReport(BaseModel):
     interpretation: str
 
 
+class ResidualReport(BaseModel):
+    model_name: str
+    mean_residual: str
+    std_residual: str
+    min_residual: str
+    max_residual: str
+    mae: str
+    rmse: str
+
+
 class AppState(rx.State):
     dataset_name: str = ""
     inspection_report: dict = {}
@@ -89,6 +99,9 @@ class AppState(rx.State):
     polynomial_report: PolynomialRegressionReport | None = None
     polynomial_chart_data: list[dict] = []
     model_comparison: list[dict] = []
+    res_model_type: str = "linear"
+    residual_report: ResidualReport | None = None
+    residual_chart_data: list[dict] = []
 
 
     def set_chart_type(self, value: str):
@@ -706,6 +719,59 @@ class AppState(rx.State):
         comparison.sort(key=lambda item: item["raw_r2"], reverse=True)
 
         self.model_comparison = comparison
+
+    def set_res_model_type(self, value: str):
+        self.res_model_type = value
+
+    def run_residual_analysis(self):
+        if not self.working_file_path or not self.reg_x_column or not self.reg_y_column:
+            return
+
+        import pandas as pd
+        from core.residuals import calculate_residuals
+
+        df = pd.read_csv(self.working_file_path)
+
+        deg = int(self.poly_degree) if self.res_model_type == "polynomial" else 1
+
+        result = calculate_residuals(
+            df,
+            x_col=self.reg_x_column,
+            y_col=self.reg_y_column,
+            model_type=self.res_model_type,
+            degree=deg
+        )
+
+        if result:
+            stats = result["statistics"]
+
+            m_name = "Linear Regression" if self.res_model_type == "Linear" else f"Polynomial Regression (Degree {deg})"
+
+            self.residual_report = ResidualReport(
+                model_name=m_name,
+                mean_residual=f"{stats['mean_residual']:.6f}",
+                std_residual=f"{stats['std_residual']:.4f}",
+                min_residual=f"{stats['min_residual']:.4f}",
+                max_residual=f"{stats['max_residual']:.4f}",
+                mae=f"{stats['mae']:.4f}",
+                rmse=f"{stats['rmse']:.4f}"
+            )
+
+            data = result["data"]
+            chart_points = []
+            for i in range(len(data["x"])):
+                chart_points.append({
+                    "x": data["x"][i],
+                    "predicted": data["predicted"][i],
+                    "residual": data["residual"][i]
+                })
+
+            chart_points.sort(key=lambda p: p["x"])
+            self.residual_chart_data = chart_points
+
+        else:
+            self.residual_report = None
+            self.residual_chart_data = []
 
 
 
