@@ -88,6 +88,7 @@ class AppState(rx.State):
     poly_degree: str = "2"
     polynomial_report: PolynomialRegressionReport | None = None
     polynomial_chart_data: list[dict] = []
+    model_comparison: list[dict] = []
 
 
     def set_chart_type(self, value: str):
@@ -656,6 +657,55 @@ class AppState(rx.State):
         else:
             self.polynomial_report = None
             self.polynomial_chart_data = []
+
+    def compare_models(self):
+        if not self.working_file_path or not self.reg_x_column or not self.reg_y_column:
+            return
+
+        import pandas as pd
+        from core.regression import (
+            calculate_linear_regression,
+            calculate_polynomial_regression,
+        )
+
+        df = pd.read_csv(self.working_file_path)
+        comparison = []
+
+        linear_result = calculate_linear_regression(
+            df,
+            self.reg_x_column,
+            self.reg_y_column,
+        )
+
+        if linear_result:
+            comparison.append({
+                "model": "Linear",
+                "r2": f"{linear_result['r2']:.4f}",
+                "rmse": f"{linear_result['rmse']:.4f}",
+                "mae": f"{linear_result['mae']:.4f}",
+                "raw_r2": float(linear_result['r2']),
+            })
+
+        for degree in [2, 3]:
+            poly_result = calculate_polynomial_regression(
+                df,
+                self.reg_x_column,
+                self.reg_y_column,
+                degree,
+            )
+
+            if poly_result:
+                comparison.append({
+                    "model": f"Polynomial (Degree {degree})",
+                    "r2": f"{poly_result['r2']:.4f}",
+                    "rmse": f"{poly_result['rmse']:.4f}",
+                    "mae": f"{poly_result['mae']:.4f}",
+                    "raw_r2": float(poly_result['r2']),
+                })
+
+        comparison.sort(key=lambda item: item["raw_r2"], reverse=True)
+
+        self.model_comparison = comparison
 
 
 
