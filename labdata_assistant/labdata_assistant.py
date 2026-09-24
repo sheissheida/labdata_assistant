@@ -6,6 +6,7 @@ from components.categorical_panel import categorical_panel
 from components.visualization_panel import visualization_panel
 from components.correlation_panel import correlation_panel
 from components.regression_panel import regression_panel
+from components.polynomial_panel import polynomial_panel
 
 
 def header() -> rx.Component:
@@ -244,6 +245,7 @@ def index() -> rx.Component:
                     visualization_panel(),
                     correlation_panel(),
                     regression_panel(),
+                    polynomial_panel(),
                     export_section(),
                     history_section(),
                     spacing="6",

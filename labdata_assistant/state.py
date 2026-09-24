@@ -48,6 +48,17 @@ class LinearRegressionReport(BaseModel):
     interpretation: str
 
 
+class PolynomialRegressionReport(BaseModel):
+    x_col: str
+    y_col: str
+    degree: int
+    equation: str
+    r2: str
+    rmse: str
+    mae: str
+    interpretation: str
+
+
 class AppState(rx.State):
     dataset_name: str = ""
     inspection_report: dict = {}
@@ -74,6 +85,9 @@ class AppState(rx.State):
     reg_y_column: str = ""
     regression_report: LinearRegressionReport | None = None
     regression_chart_data: list[dict] = []
+    poly_degree: str = "2"
+    polynomial_report: PolynomialRegressionReport | None = None
+    polynomial_chart_data: list[dict] = []
 
 
     def set_chart_type(self, value: str):
@@ -570,3 +584,78 @@ class AppState(rx.State):
         else:
             self.regression_report = None
             self.regression_chart_data = []
+
+    def set_poly_degree(self, value: str):
+        self.poly_degree = value
+
+    def run_polynomial_regression(self):
+        if not self.working_file_path or not self.reg_x_column or not self.reg_y_column:
+            return
+
+        import pandas as pd
+        import numpy as np
+        from core.regression import calculate_polynomial_regression
+
+        df = pd.read_csv(self.working_file_path)
+        deg = int(self.poly_degree)
+        result = calculate_polynomial_regression(df, self.reg_x_column, self.reg_y_column, deg)
+
+        if result:
+            coeffs = result["coefficients"]
+            r2 = result["r2"]
+
+            eq_parts = []
+            current_deg = deg
+            for c in coeffs:
+                if current_deg > 1:
+                    eq_parts.append(f"{c:.4f}X^{current_deg}")
+                elif current_deg == 1:
+                    eq_parts.append(f"{c:.4f}X")
+                else:
+                    eq_parts.append(f"{c:.4f}")
+                current_deg -= 1
+
+            eq = "Y = " + " + ".join(eq_parts).replace("+ -", "- ")
+
+            if r2 > 0.8:
+                interp = f"Strong polynomial relationship (Degree {deg}). The curve fits the data well."
+            elif r2 > 0.5:
+                interp = f"Moderate polynomial relationship (Degree {deg})."
+            else:
+                interp = "Weak polynomial relationship. A different model might be needed."
+
+            self.polynomial_report = PolynomialRegressionReport(
+                x_col=result["x_col"],
+                y_col=result["y_col"],
+                degree=deg,
+                equation=eq,
+                r2=f"{r2:.4f}",
+                rmse=f"{result['rmse']:.4f}",
+                mae=f"{result['mae']:.4f}",
+                interpretation=interp
+            )
+
+            clean_df = df[[self.reg_x_column, self.reg_y_column]].dropna()
+            chart_points = []
+
+            p=np.poly1d(coeffs)
+            for _, row in clean_df.iterrows():
+                x_val = float(row[self.reg_x_column])
+                y_val = float(row[self.reg_y_column])
+                fit_val = p(x_val)
+
+                chart_points.append({
+                    "x": x_val,
+                    "y": y_val,
+                    "poly_fit": fit_val
+                })
+
+            chart_points.sort(key=lambda item: item["x"])
+            self.polynomial_chart_data = chart_points
+
+        else:
+            self.polynomial_report = None
+            self.polynomial_chart_data = []
+
+
+
