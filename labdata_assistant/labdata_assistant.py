@@ -9,6 +9,7 @@ from components.regression_panel import regression_panel
 from components.polynomial_panel import polynomial_panel
 from components.comparison_panel import comparison_panel
 from components.residual_panel import residual_panel
+from components.export_panel import export_panel
 
 
 def header() -> rx.Component:
@@ -252,6 +253,7 @@ def index() -> rx.Component:
                     residual_panel(),
                     export_section(),
                     history_section(),
+                    export_panel(),
                     spacing="6",
                     width="100%",
                 ),

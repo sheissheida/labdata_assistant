@@ -186,31 +186,43 @@ class AppState(rx.State):
     
     async def handle_upload(self, files: list[rx.UploadFile]):
         if not files:
-            return
+            return rx.toast.warning("No file selected.", position="bottom-right")
+        
         file = files[0]
+
+        if not file.filename.lower().endswith(".csv"):
+            return rx.toast.error("Invalid format! Please upload a CSV file.", position="bottom-right")
+        
         upload_data = await file.read()
 
+        import os
         os.makedirs(".uploads", exist_ok=True)
         save_path = f".uploads/{file.filename}"
+
         with open(save_path, "wb") as f:
             f.write(upload_data)
 
-        df = load_dataset(save_path)
-        self.inspection_report = inspect_dataset(df)
+        try:
+            df = load_dataset(save_path)
+            self.inspection_report = inspect_dataset(df)
 
-        self.raw_file_path = save_path
-        self.working_file_path = save_path
+            self.raw_file_path = save_path
+            self.working_file_path = save_path
 
-        self.dataset_name = str(file.filename)
-        self.is_loaded = True
-        self.is_cleaned = False
-        self.cleaning_report = {}
-        self.cleaning_history = []
+            self.dataset_name = str(file.filename)
+            self.is_loaded = True
+            self.is_cleaned = False
+            self.cleaning_report = {}
+            self.cleaning_history = []
 
-        self.data_version = 0
-        self.outlier_report = {}
-        self.outlier_report_version = -1
+            self.data_version = 0
+            self.outlier_report = {}
+            self.outlier_report_version = -1
 
+            return rx.toast.success("Dataset loaded successfully!", position="bottom-right")
+
+        except Exception as e:
+            return rx.toast.error("Error processing file! Please make sure the file structure is intact.", position="bottom-right")
 
     def remove_duplicate_rows(self):
         if not self.working_file_path:
@@ -543,8 +555,14 @@ class AppState(rx.State):
         self.reg_y_column = value
 
     def run_linear_regression(self):
-        if not self.working_file_path or not self.reg_y_column:
-            return
+        if not self.working_file_path:
+            return rx.toast.info("Please upload a dataset first.", position="bottom-right")
+
+        if not self.reg_x_column or not self.reg_y_column:
+            return rx.toast.warning("Please select both X and Y columns for analysis.", position="bottom-right")
+
+        if self.reg_x_column == self.reg_y_column:
+            return rx.toast.error("Independent (X) and Dependent (Y) columns cannot be the same.", position="bottom-right")
 
         import pandas as pd
         from core.regression import calculate_linear_regression
@@ -773,5 +791,90 @@ class AppState(rx.State):
             self.residual_report = None
             self.residual_chart_data = []
 
+    def download_excel_report(self):
+        if not self.working_file_path:
+            return rx.window_alert("No data available to export.")
 
+        import pandas as pd
+        import io
+        from core.exporter import export_to_excel
 
+        df = pd.read_csv(self.working_file_path)
+
+        excel_stream = io.BytesIO()
+
+        export_to_excel(
+            raw_df=df,
+            cleaning_history=getattr(self, "cleaning_history", []),
+            statistics=getattr(self, "descriptive_stats", []),
+            model_comparison=self.model_comparison,
+            output_path=excel_stream
+        )
+
+        excel_stream.seek(0)
+
+        return rx.download(
+            data=excel_stream.read(),
+            filename="LabData_Analysis_Report.xlsx"
+        )
+
+    def download_pdf_report(self):
+        if not self.working_file_path:
+            return rx.window_alert("No data available to export.")
+
+        import pandas as pd
+        import numpy as np
+        import io
+        from core.pdf_report import generate_pdf_report
+
+        df = pd.read_csv(self.working_file_path)
+
+        numeric_cols = df.select_dtypes(include='number').columns
+        live_stats = []
+        for col in numeric_cols:
+            live_stats.append({
+                "Column": col,
+                "Mean": df[col].mean(),
+                "Std": df[col].std(),
+                "Min": df[col].min(),
+                "Max": df[col].max()
+            })
+
+        chart_data = {}
+        x_col = getattr(self, "reg_x_column", None)
+        y_col = getattr(self, "reg_y_column", None)
+
+        if x_col and y_col and x_col in df.columns and y_col in df.columns:
+            clean_df = df[[x_col, y_col]].dropna()
+            if len(clean_df) > 1:
+                x_vals = clean_df[x_col].values
+                y_actual = clean_df[y_col].values
+
+                slope, intercept = np.polyfit(x_vals, y_actual, 1)
+                y_pred = slope * x_vals + intercept
+                
+                chart_data = {
+                    "x": x_vals.tolist(),
+                    "y_actual": y_actual.tolist(),
+                    "y_pred": y_pred.tolist(),
+                    "x_label": x_col,
+                    "y_label": y_col
+                }
+
+        report_snapshot = {
+            "total_rows": len(df),
+            "total_columns": len(df.columns),
+            "cleaning_history": getattr(self, "cleaning_history", []),
+            "statistics": live_stats,
+            "model_comparison": getattr(self, "model_comparison", []),
+            "chart_data": chart_data,
+        }
+
+        pdf_stream = io.BytesIO()
+        generate_pdf_report(report_data=report_snapshot, output_path_or_stream=pdf_stream)
+        pdf_stream.seek(0)
+
+        return rx.download(
+            data=pdf_stream.read(),
+            filename="LabData_Analysis_Report.pdf"
+        )

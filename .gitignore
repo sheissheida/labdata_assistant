@@ -1,17 +1,28 @@
-assets/external/
-.states
-.web
-# Python
+# Environments
 venv/
-__pycache__/
-*.py[cod]
+env/
+.venv/
 
-# Database and Uploads
+# Reflex & Build
+.web/
+__pycache__/
+*.pyc
+*.pyo
+
+# Databases & User Data
 *.db
+*.sqlite3
 uploads/
 
-# AI and IDE specific
-.claude/
-.claude.json
-.claudeproject
-.vscode/
+# AI Agents Context
+CLAUDE.md
+AGENTS.md
+
+# Temp Exports & Test Reports
+labdata_export_temp*.xlsx
+test_report.pdf
+test_report.xlsx
+
+# OS generated files
+.DS_Store
+Thumbs.db
